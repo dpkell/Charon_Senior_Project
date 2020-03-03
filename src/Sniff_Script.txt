@@ -1,0 +1,163 @@
+#! /bin/sh
+# Donny Kell
+# CSCI4950: Senior Project
+
+echo "Please enter the date of the log files you wish to enter in the following format: YYYY_MM_DD"
+read log_date
+
+log_dir="~/snort_logs/$log_date"
+ip_log_dir="~/snort_logs/$log_date/log_by_ip/"
+udp_alert_file="~/snort_logs/$log_date/udp_flood_alert.txt"
+syn_alert_file="~/snort_logs/$log_date/syn_flood_alert.txt"
+scan_alert_file="~/snort_logs/$log_date/port_scan_alert.txt"
+ftp_alert_file="~/snort_logs/$log_date/ftp_alert.txt"
+snmp_alert_file="~/snort_logs/$log_date/snmp_alert.txt"
+ssh_alert_file="~/snort_logs/$log_date/ssh_alert.txt"
+udp_trip_count=0
+syn_trip_count=0
+port_trip_count=0
+ftp_trip_count=0
+snmp_trip_count=0
+ssh_trip_count=0
+
+
+udp_flood () {
+local file=$1
+local ip_address=`echo "${file}" | cut -f 1-4 -d '.' | cut -f 7 -d '/'`
+udp_unreachable=`grep -E 'ICMP|Port Unreachable' ${file} | wc -l`
+
+if [ ${udp_unreachable} -gt 200 ]
+then
+	echo "Alert! Possible UDP Flood detected in log file: ${ip_address}! \n Would you like to generate a rule and activate Snort in IDS mode? [y/n]"
+	read udp_choice
+	case $udp_choice in
+		[yY]*) echo "${ip_address}" >> ~/snort_logs/$log_date/udp_flood_alert.txt ;
+		       	udp_trip_count=`expr $udp_trip_count + 1`
+			continue ;;
+		[nN]*) continue ;;
+		*) echo "Please select a valid option [y/n]." ;;
+	esac
+fi
+
+}
+
+syn_flood () {
+
+local file=$1
+local ip_address=`echo "${file}" | cut -f 1-4 -d '.' | cut -f 7 -d '/'`
+syn_count=`grep -E '\[S\]+' ${file} | cut -f 6 -d ' ' | grep -E '192.168.1.[0-9]{1,3}+.[0-9]{1,5}+' | cut -f 5 -d '.' | wc -l`
+ack_count=`grep -E 'ack [0-9]+' ${file} | cut -f 6 -d ' ' | grep -E '192.168.1.[0-9]{1,3}+.[0-9]{1,5}+' | cut -f 5 -d '.' | wc -l`
+open_syn=`expr $syn_count - $ack_count`
+
+if [ ${open_syn} -gt 1000 ] 
+then
+	echo "Alert! Possible SYN Flood detecting in log file: ${ip_address}! \n Would you like to generate a rule and activate Snort in IDS mode [y/n]"
+	read syn_choice
+	case $syn_choice in
+		[yY]*) echo "${ip_address}" >> ~/snort_logs/$log_date/syn_flood_alert.txt ;
+			syn_trip_count=`expr $syn_trip_count + 1`
+			continue ;;
+		[nN]*) continue ;;
+		*) echo "Please select a valid option [y/n]." ;;
+	esac
+fi
+
+}
+
+port_scan () {
+local file=$1
+local ip_address=`echo "${file}" | cut -f 1-4 -d '.' | cut -f 7 -d '/'`
+port_scan_count=`grep -E '\[R.\]+' ${file} | cut -f 4 -d ' ' | grep -E '192.168.1.[0-9]{1,3}+.[0-9]{1,5}+' | cut -f 5 -d '.' | sort -n | uniq |  wc -l`
+
+if [ ${port_scan_count} -gt 200 ] 
+then
+	echo "Alert! Possible port scan in log file: ${ip_address}! \n Would you like to generate a rule and activate Snort in IDS Mode? [y/n]"
+	read scan_choice
+	case $scan_choice in
+		[yY]*)  echo "${ip_address}" >> ~/snort_logs/$log_date/port_scan_alert.txt ;
+			port_trip_count=`expr $port_trip_count + 1`
+			continue ;;
+		[nN]*) continue ;;
+		*) echo "Please select a valid option [y/n]." ;;
+	esac
+fi
+}
+
+ftp_connection () {
+local file=$1
+local ip_address=`echo "${file}" | cut -f 1-4 -d '.' | cut -f 7 -d '/'`
+ftp_attempt=`grep -E '\[S\]+' ${file} | grep -E '192.168.1.[0-9]{1,3}+.21|192.168.1.[0-9]{1,3}+.2100|192.168.1.[0-9]{1,3}+.3535' | wc -l`
+
+if [ ${ftp_attempt} -gt 0 ]
+then
+	echo "Alert! FTP connection attempt detected in log file: ${ip_address}! \n Would you like to generate a rule and activate snort in IDS mode? [y/n]"
+	read ftp_choice
+	case $ftp_choice in
+		[yY]*)  echo "${ip_address}" >> ~/snort_logs/$log_date/ftp_alert.txt ;
+			ftp_trip_count=`expr $ftp_trip_count + 1`
+			continue ;;
+		[nN]*) continue ;;
+		*) echo "Please select a valid option [y/n]." ;;
+	esac
+fi
+}
+
+snmp_connection () {
+
+local file=$1
+local ip_address=`echo "${file}" | cut -f 1-4 -d '.' | cut -f 7 -d '/'`
+snmp_attempt=`grep -E 'UDP' ${file} | grep -E '192.168.1.[0-9]{1,3}+.161|192.168.1.[0-9]{1,3}+.162' | wc -l`
+
+if [ ${snmp_attempt} -gt 0 ]
+then
+	echo "Alert! SNMP connection detected in log file: ${ip_address}! \n Would you like to generate a rule and activate snort in IDS mode? [y/n]"
+	read snmp_choice
+	case $snmp_choice in
+		[yY]*)  echo "${ip_address}" >> ~/snort_logs/$log_date/snmp_alert.txt ;
+			snmp_trip_count=`expr $snmp_trip_count + 1`
+			continue ;;
+		[nN]*) continue ;;
+		*) echo "Please select a valid option [y/n]." ;;
+	esac
+fi
+}
+
+ssh_connection () {
+local file=$1
+local ip_address=`echo "${file}" | cut -f 1-4 -d '.' | cut -f 7 -d '/'`
+ssh_attempt=`grep -E '\[S\]+' ${file} | grep -E '192.168.1.[0-9]{1,3}+.22' | wc -l`
+
+if [ ${ssh_attempt} -gt 0 ]
+then
+	echo "Alert! SSH connection detected in log file: ${ip_address}! \n Would you like to generate a rule and activate snort in IDS mode? [y/n]"
+	read ssh_choice
+	case $ssh_choice in
+		[yY]*)  echo "${ip_address}" >> ~/snort_logs/$log_date/ssh_alert.txt ;
+		       	ssh_trip_count=`expr $ssh_trip_count + 1`
+		       continue ;;
+	        [nN]*)  continue ;;
+		*) echo "Please select a valid option [y/n]." ;;
+	esac
+fi			       
+}
+
+for file in ~/snort_logs/$log_date/log_by_ip/*
+do
+        udp_flood $file
+        syn_flood $file
+        port_scan $file
+        ftp_connection $file
+        snmp_connection $file
+	ssh_connection $file
+done
+
+~/Charon/Scripts/Rule_Creation ~/snort_logs/$log_date/udp_flood_alert.txt ~/snort_logs/$log_date/syn_flood_alert.txt ~/snort_logs/$log_date/port_scan_alert.txt  ~/snort_logs/$log_date/ftp_alert.txt ~/snort_logs/$log_date/snmp_alert.txt ~/snort_logs/$log_date/ssh_alert.txt 
+
+total_trip=`expr $udp_trip_count + $syn_trip_count + $port_trip_count + $ftp_trip_count + $snmp_trip_count`
+
+if [ ${total_trip} -gt 0 ]
+then
+      echo "done" #sudo snort -d -l ${log_dir} -c /etc/snort/snort.conf
+fi
+
+

@@ -1,0 +1,13 @@
+#! /bin/sh
+# Donny Kell
+# CSCI4950 Senior Project
+
+date=`date +"%Y_%m_%d"`
+logFile="$1"
+ipList="$2"
+
+while read ip_address
+do
+	grep "${ip_address}.\+" $logFile > /home/daedalus/snort_logs/${date}/log_by_ip/${ip_address}.txt
+done < $ipList
+

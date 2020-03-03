@@ -1,0 +1,89 @@
+#! /bin/sh
+# Donny Kell
+# CSCI4950 - Senior Project
+HOME_NET=192.168.1.0/24
+
+udp_flood_file=$1
+syn_flood_file=$2
+port_scan_file=$3
+ftp_file=$4
+snmp_file=$5
+ssh_file=$6
+
+
+udp_flood_rule_generation () {
+
+echo "alert udp $udp_addr any -> $HOME_NET any ( \n msg:\"Multiple UDP requests\"; \n flow:not_established,to_server; \n detection_filter:track by_src, count 50, seconds 2; \n sid:1000001 rev:1) \n" | sudo tee -a /etc/snort/rules/dos.rules
+
+echo "drop udp $udp_addr any -> $HOME_NET any ( \n msg:\"Possible UDP Flood attack\"; \n flow:not_established,to_server; \n detection_filter:track by_src, count 500, seconds 2; \n sid:1000002 rev:1) \n" | sudo tee -a /etc/snort/rules/dos.rules
+
+}
+
+syn_flood_rule_generation () {
+
+echo "alert tcp $syn_addr any -> $HOME_NET any ( \n msg:\"multiple TCP Syn requests\"; \n flow:not_established,to_server; \n detection_filter:track by_src, count 50, seconds 2; \n sid:1000003 rev:1) \n" | sudo tee -a /etc/snort/rules/dos.rules
+
+echo "drop tcp $syn_addr any -> $HOME_NET any ( \n msg:\"Possible Syn Flood attack\"; \n flow:not_established,to_server; \n detection_filter:track by_src, count 500, seconds 2; \n sid:1000004 rev:1) \n" | sudo tee -a /etc/snort/rules/dos.rules
+
+}
+
+port_scan_rule_creation () {
+
+echo "alert tcp $port_addr any -> $HOME_NET 1:65535 ( \n msg:\"Possible Port Scan\"; \n flow:not_established,to_server; \n detection_filter:track by_src, count 50, seconds 5; \n sid:1000005 rev:1) \n" | sudo tee -a /etc/snort/rules/scan.rules
+
+}
+
+ftp_connection_rule_creation () {
+
+echo "alert tcp $ftp_addr any -> $HOME_NET 21 ( \n msg:\"FTP Connection Attempt\"; \n flow:not_established,to_server; \n  sid:1000006 rev:1) \n" | sudo tee -a /etc/snort/rules/ftp.rules
+
+echo "alert tcp $ftp_addr any -> $HOME_NET 21 ( \n msg:\"FTP Connection\"; \n flow:established,to_server; \n  sid:1000007 rev:1) \n" | sudo tee -a /etc/snort/rules/ftp.rules
+
+}
+
+snmp_connection_rule_creation () {
+
+echo "alert tcp $snmp_addr any -> $HOME_NET 21 ( \n msg:\"SNMP Connection Attempt\"; \n flow:not_established,to_server; \n  sid:1000008 rev:1) \n" | sudo tee -a /etc/snort/rules/snmp.rules
+
+echo "alert tcp $snmp_addr any -> $HOME_NET 21 ( \n msg:\"SNMP Connection\"; \n flow:established,to_server; \n  sid:1000009 rev:1) \n" | sudo tee -a /etc/snort/rules/snmp.rules
+
+}
+
+ssh_connection_rule_creation () {
+
+echo "alert tcp $ssh_addr any -> $HOME_NET 22 ( \n msg:\"SSH Connection Attempt\"; \n flow:not_established,to_server; \n  sid:1000010 rev:1) \n" |sudo tee -a /etc/snort/rules/shellcode.rules
+
+echo "alert tcp $ssh_addr any -> $HOME_NET 22 ( \n msg:\"SSH Connection\"; \n flow:established,to_server; \n  sid:1000011 rev:1) \n" | sudo tee -a /etc/snort/rules/shellcode.rules
+
+}
+
+for udp_addr in $udp_flood_file
+do
+	udp_flood_rule_generation $udp_addr
+done < $1
+
+for syn_addr in $syn_flood_file
+do
+	syn_flood_rule_generation $syn_addr
+done < $2
+
+for port_addr in $port_scan_file
+do
+	port_scan_rule_creation $port_addr
+done < $3
+
+for ftp_addr in $ftp_file
+do
+	ftp_connection_rule_creation $ftp_addr
+done < $4
+
+for snmp_addr in $snmp_file
+do
+	snmp_connection_rule_creation $snmp_addr
+done < $5
+
+for ssh_addr in $ssh_file
+do
+	ssh_connection_rule_creation $ssh_addr
+done < $6
+

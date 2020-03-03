@@ -1,0 +1,13 @@
+#! /bin/sh
+# Name: Donny Kell
+# CSCI4950: Senior Project
+
+date=`date +"%Y_%m_%d"`
+mkdir ~/snort_logs/${date}
+
+sort +4.0 -4.11 +6.0 -6.11 +2.0 -2.12 $1 -o ~/snort_logs/${date}/${date}.txt
+
+grep -o "[0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+" ~/snort_logs/${date}/${date}.txt | sort | uniq > ~/snort_logs/${date}/ip_address_list.txt # Finds all unique ip addresses
+
+mkdir ~/snort_logs/${date}/log_by_ip
+
